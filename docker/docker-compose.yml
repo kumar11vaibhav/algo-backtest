@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  paper_trader:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: paper_trader
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    container_name: nifty_paper_trader
+    volumes:
+      - ../logs:/app/logs
+      - ../data:/app/data
+      - ../trade_logs:/app/data/trade_logs
+      - ../data/paper_trade_state.json:/app/data/paper_trade_state.json
+    user: "${UID}:${GID}"
+    environment:
+      - TZ=Asia/Kolkata
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
