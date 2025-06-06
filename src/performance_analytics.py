@@ -28,32 +28,67 @@ class PerformanceAnalytics:
         
     def calculate_metrics(self, initial_balance):
         """Calculate performance metrics"""
-        final_balance = self.stats['final_balance']
-        total_return = ((final_balance - initial_balance) / initial_balance) * 100
-        
-        total_trades = self.stats['total_trades']
-        winning_trades = self.stats['winning_trades']
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-        
-        total_pnl = sum(self.trade_log_df['pnl'].dropna())
-        avg_pnl_per_trade = total_pnl / total_trades if total_trades > 0 else 0
-        
-        profit_factor = abs(
-            sum(self.trade_log_df[self.trade_log_df['pnl'] > 0]['pnl'].fillna(0)) /
-            sum(self.trade_log_df[self.trade_log_df['pnl'] < 0]['pnl'].fillna(0))
-        ) if sum(self.trade_log_df[self.trade_log_df['pnl'] < 0]['pnl'].fillna(0)) != 0 else float('inf')
-        
-        return {
-            'Initial Balance': f"Rs. {initial_balance:,.2f}",
-            'Final Balance': f"Rs. {final_balance:,.2f}",
-            'Total Return': f"{total_return:.2f}%",
-            'Total Trades': total_trades,
-            'Win Rate': f"{win_rate:.1f}%",
-            'Average P&L per trade': f"Rs. {avg_pnl_per_trade:,.2f}",
-            'Largest Profit': f"Rs. {self.stats['max_profit']:,.2f}",
-            'Largest Loss': f"Rs. {self.stats['max_loss']:,.2f}",
-            'Profit Factor': f"{profit_factor:.2f}"
-        }
+        try:
+            final_balance = self.stats.get('final_balance', initial_balance)
+            total_return = ((final_balance - initial_balance) / initial_balance) * 100
+            
+            total_trades = self.stats.get('total_trades', 0)
+            winning_trades = self.stats.get('winning_trades', 0)
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            
+            # Handle case where 'pnl' column doesn't exist or has a different name
+            pnl_column = None
+            for col in ['pnl', 'PnL', 'profit_loss', 'profit']:
+                if col in self.trade_log_df.columns:
+                    pnl_column = col
+                    break
+            
+            if pnl_column is not None and not self.trade_log_df.empty:
+                pnl_series = self.trade_log_df[pnl_column].dropna()
+                total_pnl = pnl_series.sum()
+                avg_pnl_per_trade = total_pnl / total_trades if total_trades > 0 else 0
+                
+                # Calculate profit factor
+                winning_pnl = pnl_series[pnl_series > 0].sum()
+                losing_pnl = pnl_series[pnl_series < 0].sum()
+                profit_factor = abs(winning_pnl / losing_pnl) if losing_pnl != 0 else float('inf')
+            else:
+                total_pnl = final_balance - initial_balance
+                avg_pnl_per_trade = total_pnl / total_trades if total_trades > 0 else 0
+                profit_factor = float('inf')  # Default to infinity if no losing trades
+            
+            metrics = {
+                'Initial Balance': f"Rs. {initial_balance:,.2f}",
+                'Final Balance': f"Rs. {final_balance:,.2f}",
+                'Total Return': f"{total_return:.2f}%",
+                'Total Trades': total_trades,
+                'Win Rate': f"{win_rate:.1f}%" if total_trades > 0 else "N/A",
+                'Average P&L per trade': f"Rs. {avg_pnl_per_trade:,.2f}",
+                'Total P&L': f"Rs. {total_pnl:,.2f}",
+                'Profit Factor': f"{profit_factor:.2f}"
+            }
+            
+            # Add max profit/loss if available
+            if 'max_profit' in self.stats:
+                metrics['Largest Profit'] = f"Rs. {self.stats['max_profit']:,.2f}"
+            if 'max_loss' in self.stats:
+                metrics['Largest Loss'] = f"Rs. {self.stats['max_loss']:,.2f}"
+                
+            return metrics
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Error in calculate_metrics: {str(e)}")
+            import traceback
+            logging.error(traceback.format_exc())
+            
+            # Return basic metrics even if there's an error
+            return {
+                'Initial Balance': f"Rs. {initial_balance:,.2f}",
+                'Final Balance': f"Rs. {self.stats.get('final_balance', initial_balance):,.2f}",
+                'Total Trades': self.stats.get('total_trades', 0),
+                'Error': f"Error calculating metrics: {str(e)}"
+            }
     
     def plot_equity_curve(self):
         """Plot equity curve"""
