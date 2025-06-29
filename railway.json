@@ -1,0 +1,29 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "docker build -f docker/Dockerfile --target paper_trader -t nifty-paper-trader ."
+  },
+  "deploy": {
+    "startCommand": "python -m src.paper_trader",
+    "restartPolicyType": "ALWAYS",
+    "restartPolicyMaxRetries": 10
+  },
+  "checks": {
+    "healthcheck": {
+      "timeout": 30,
+      "interval": 60,
+      "startPeriod": 30
+    }
+  },
+  "mounts": {
+    "data": "/app/data",
+    "logs": "/app/logs"
+  },
+  "variables": {
+    "TZ": {
+      "description": "Timezone for the application",
+      "value": "Asia/Kolkata"
+    }
+  }
+}

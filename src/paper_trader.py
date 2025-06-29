@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, time as dt_time
 import pytz
+import time
 import time as time_module
 import zoneinfo
 import os
@@ -189,6 +190,9 @@ class PaperTrader:
 
     def execute_paper_trade(self, action, strike=None, price=None, reason=None):
         """Execute and log a paper trade"""
+        # Mark that we've executed at least one trade today
+        self.trades_executed_today = True
+        
         trade = {
             "date": datetime.now(),
             "action": action,
@@ -277,6 +281,10 @@ class PaperTrader:
         self.logger.info("Starting paper trading session...")
         consecutive_failures = 0
         max_consecutive_failures = 5
+        
+        # Track if any trades were executed today
+        self.trades_executed_today = False
+        self.last_trade_check_date = datetime.now().date()
 
         while True:
             try:
@@ -317,6 +325,28 @@ class PaperTrader:
 
                     # Reset failure counter on successful data fetch
                     consecutive_failures = 0
+                    
+                    # Check if we need to log a 'NO_TRADE' record for the previous day
+                    current_date = datetime.now().date()
+                    if current_date != self.last_trade_check_date:
+                        if not self.trades_executed_today and self.check_market_hours():
+                            # Log 'NO_TRADE' for the previous day
+                            self.logger.info("No trades executed yesterday, logging 'NO_TRADE' record")
+                            no_trade_record = {
+                                'date': datetime.combine(self.last_trade_check_date, datetime.min.time()),
+                                'action': 'NO_TRADE',
+                                'strike': '',
+                                'price': '',
+                                'quantity': '',
+                                'balance_before': self.current_balance,
+                                'pnl': 0,
+                                'reason': 'No trade conditions met'
+                            }
+                            self.log_trade_to_csv(no_trade_record)
+                        
+                        # Reset for the new day
+                        self.trades_executed_today = False
+                        self.last_trade_check_date = current_date
 
                     # Get historical data for volatility calculation
                     self.logger.debug("Calculating historical volatility...")
@@ -347,7 +377,7 @@ class PaperTrader:
                     self.logger.debug(f"Current time in IST: {current_time}")
 
                     # Check for exit at 9:30 AM
-                    if current_time >= dt_time(9, 30) and self.positions:
+                    if current_time >= time(9, 30) and self.positions:
                         self.logger.info("Checking for exit conditions...")
                         current_option_price = self.option_pricer.calculate_price(
                             spot_price,

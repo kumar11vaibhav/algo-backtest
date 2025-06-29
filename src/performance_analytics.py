@@ -27,33 +27,76 @@ class PerformanceAnalytics:
         os.makedirs(self.charts_dir, exist_ok=True)
         
     def calculate_metrics(self, initial_balance):
-        """Calculate performance metrics"""
-        final_balance = self.stats['final_balance']
-        total_return = ((final_balance - initial_balance) / initial_balance) * 100
+        """
+        Calculate performance metrics with robust error handling
         
-        total_trades = self.stats['total_trades']
-        winning_trades = self.stats['winning_trades']
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-        
-        total_pnl = sum(self.trade_log_df['pnl'].dropna())
-        avg_pnl_per_trade = total_pnl / total_trades if total_trades > 0 else 0
-        
-        profit_factor = abs(
-            sum(self.trade_log_df[self.trade_log_df['pnl'] > 0]['pnl'].fillna(0)) /
-            sum(self.trade_log_df[self.trade_log_df['pnl'] < 0]['pnl'].fillna(0))
-        ) if sum(self.trade_log_df[self.trade_log_df['pnl'] < 0]['pnl'].fillna(0)) != 0 else float('inf')
-        
-        return {
+        Args:
+            initial_balance: Starting account balance
+            
+        Returns:
+            dict: Dictionary containing performance metrics
+        """
+        # Initialize default metrics
+        metrics = {
             'Initial Balance': f"Rs. {initial_balance:,.2f}",
-            'Final Balance': f"Rs. {final_balance:,.2f}",
-            'Total Return': f"{total_return:.2f}%",
-            'Total Trades': total_trades,
-            'Win Rate': f"{win_rate:.1f}%",
-            'Average P&L per trade': f"Rs. {avg_pnl_per_trade:,.2f}",
-            'Largest Profit': f"Rs. {self.stats['max_profit']:,.2f}",
-            'Largest Loss': f"Rs. {self.stats['max_loss']:,.2f}",
-            'Profit Factor': f"{profit_factor:.2f}"
+            'Final Balance': f"Rs. {initial_balance:,.2f}",
+            'Total Return': "0.00%",
+            'Total Trades': 0,
+            'Win Rate': "0.0%",
+            'Average P&L per trade': "Rs. 0.00",
+            'Largest Profit': "Rs. 0.00",
+            'Largest Loss': "Rs. 0.00",
+            'Profit Factor': "0.00"
         }
+        
+        try:
+            if self.trade_log_df.empty or 'pnl' not in self.trade_log_df.columns:
+                return metrics
+                
+            # Filter only exit trades for PnL calculation
+            exit_trades = self.trade_log_df[self.trade_log_df['action'] == 'EXIT_AT_930']
+            if exit_trades.empty:
+                return metrics
+                
+            # Calculate basic metrics
+            total_trades = len(exit_trades)
+            winning_trades = exit_trades[exit_trades['pnl'] > 0]
+            losing_trades = exit_trades[exit_trades['pnl'] < 0]
+            
+            total_pnl = exit_trades['pnl'].sum()
+            final_balance = initial_balance + total_pnl
+            total_return = (total_pnl / initial_balance) * 100 if initial_balance > 0 else 0
+            
+            # Calculate win rate and average PnL
+            win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
+            avg_pnl = total_pnl / total_trades if total_trades > 0 else 0
+            
+            # Calculate profit factor
+            gross_profit = float(winning_trades['pnl'].sum()) if not winning_trades.empty else 0.0
+            gross_loss = abs(float(losing_trades['pnl'].sum())) if not losing_trades.empty else 0.0
+            profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else float('inf')
+            
+            # Get largest profit and loss
+            max_profit = float(winning_trades['pnl'].max()) if not winning_trades.empty else 0.0
+            max_loss = float(losing_trades['pnl'].min()) if not losing_trades.empty else 0.0
+            
+            # Update metrics
+            metrics.update({
+                'Final Balance': f"Rs. {final_balance:,.2f}",
+                'Total Return': f"{total_return:.2f}%",
+                'Total Trades': total_trades,
+                'Win Rate': f"{win_rate:.1f}%",
+                'Average P&L per trade': f"Rs. {avg_pnl:,.2f}",
+                'Largest Profit': f"Rs. {max_profit:,.2f}",
+                'Largest Loss': f"Rs. {max_loss:,.2f}",
+                'Profit Factor': f"{profit_factor:.2f}"
+            })
+            
+            return metrics
+            
+        except Exception as e:
+            print(f"Error calculating metrics: {str(e)}")
+            return metrics
     
     def plot_equity_curve(self):
         """Plot equity curve"""
