@@ -39,10 +39,10 @@ echo Lot Size: %LOT_SIZE%
 echo Date Range: %START_DATE% to %END_DATE%
 echo.
 
-:: Change to the src directory relative to the script location
-cd /d "%~dp0..\src"
+:: Change to the project root directory
+cd /d "%~dp0..\..\src"
 
-:: Run the backtest
+:: Run the backtest with the full path to main.py
 python main.py --initial-balance %INITIAL_BALANCE% --lot-size %LOT_SIZE% --start-date %START_DATE% --end-date %END_DATE%
 
 if errorlevel 1 (

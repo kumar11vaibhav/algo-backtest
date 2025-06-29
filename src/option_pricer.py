@@ -1,10 +1,12 @@
 import numpy as np
 from scipy.stats import norm
+import logging
 
 class OptionPricer:
     def __init__(self, base_volatility=0.15, interest_rate=0.07):
         self.base_volatility = base_volatility
         self.interest_rate = interest_rate
+        self.logger = logging.getLogger(__name__)
         
     def calculate_price(self, spot, strike, days_to_expiry, hist_vol=None, option_type='call'):
         """Calculate theoretical option price using Black-Scholes formula with dynamic volatility"""

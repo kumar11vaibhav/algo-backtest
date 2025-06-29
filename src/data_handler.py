@@ -76,3 +76,11 @@ class DataHandler:
         """Get strike price three steps below spot price for cheaper premiums"""
         atm_strike = int(spot_price / step) * step
         return atm_strike - (3 * step)  # Return three strikes below ATM
+        
+    def get_all_data(self):
+        """Return the complete dataset with OHLCV data"""
+        if self.data is None or self.data.empty:
+            if not self.fetch_historical_data(self.start_date, self.end_date):
+                self.logger.error("Failed to fetch historical data")
+                return pd.DataFrame()
+        return self.data
